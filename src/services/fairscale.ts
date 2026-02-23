@@ -24,6 +24,8 @@ export interface LeaderboardEntry {
     wallet: string;
     score: number;
     tier: string;
+    handle?: string;
+    pfp?: string;
 }
 
 export interface TierEntry {
@@ -92,21 +94,37 @@ export class FairScaleService {
         }
     }
 
-    static getLeaderboard(): LeaderboardEntry[] {
+    static async getLeaderboard(): Promise<LeaderboardEntry[]> {
         try {
-            const saved = JSON.parse(localStorage.getItem(this.STORAGE_KEY) || '{}');
-            const entries: LeaderboardEntry[] = Object.values(saved);
+            const response = await fetch('https://app.fairscale.xyz/api/leaderboard?page=1&limit=10');
+            if (!response.ok) throw new Error('Failed to fetch leaderboard');
+            const data = await response.json();
 
-            // Sort by score descending and take top 10
-            return entries
-                .sort((a, b) => b.score - a.score)
-                .map((item, index) => ({
-                    ...item,
-                    rank: index + 1
-                }))
-                .slice(0, 10);
+            return data.data.map((item: any, index: number) => ({
+                rank: index + 1,
+                wallet: item.wallet.slice(0, 4) + '...' + item.wallet.slice(-4),
+                score: item.fair_score,
+                tier: item.tier || 'bronze',
+                handle: item.twitter_handle,
+                pfp: item.twitter_pfp,
+                fullWallet: item.wallet
+            }));
         } catch (e) {
-            return [];
+            console.error('Failed to fetch global leaderboard:', e);
+            // Fallback to local persistence if API fails
+            try {
+                const saved = JSON.parse(localStorage.getItem(this.STORAGE_KEY) || '{}');
+                const entries: LeaderboardEntry[] = Object.values(saved);
+                return entries
+                    .sort((a, b) => b.score - a.score)
+                    .map((item, index) => ({
+                        ...item,
+                        rank: index + 1
+                    }))
+                    .slice(0, 10);
+            } catch (err) {
+                return [];
+            }
         }
     }
 

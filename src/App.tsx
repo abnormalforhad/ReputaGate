@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { FairScaleService } from './services/fairscale';
-import type { FairScoreResponse } from './services/fairscale';
+import type { FairScoreResponse, LeaderboardEntry } from './services/fairscale';
 import './index.css';
 
 function App() {
@@ -30,8 +30,26 @@ function App() {
     }
   };
 
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
+
+  useEffect(() => {
+    fetchGlobalLeaderboard();
+  }, []);
+
+  const fetchGlobalLeaderboard = async () => {
+    setLoadingLeaderboard(true);
+    try {
+      const data = await FairScaleService.getLeaderboard();
+      setLeaderboard(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingLeaderboard(false);
+    }
+  };
+
   const aprBonus = scoreData ? FairScaleService.getAPRBonus(scoreData.tier) : 0;
-  const leaderboard = FairScaleService.getLeaderboard();
   const distribution = FairScaleService.getTierDistribution();
   const tickerItems = FairScaleService.getActivityFeed();
 
@@ -138,14 +156,22 @@ function App() {
 
         <section className="sidebar">
           <div className="side-card">
-            <h3 style={{ fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--primary)', marginBottom: '20px' }}>Global Leaderboard</h3>
-            {leaderboard.length === 0 ? (
+            <h3 style={{ fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--primary)', marginBottom: '20px', display: 'flex', justifyContent: 'space-between' }}>
+              <span>Global Leaderboard</span>
+              <span style={{ fontSize: '0.6rem', opacity: 0.5 }}>Official Feed</span>
+            </h3>
+            {loadingLeaderboard ? (
+              <div style={{ fontSize: '0.75rem', opacity: 0.5, padding: '20px 0' }}>Syncing Global Rankings...</div>
+            ) : leaderboard.length === 0 ? (
               <div style={{ fontSize: '0.75rem', opacity: 0.5, padding: '20px 0' }}>No on-chain records found.</div>
             ) : leaderboard.map(item => (
-              <div key={item.rank} className="leaderboard-item">
+              <div key={item.wallet} className="leaderboard-item">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <div className="rank-badge">{item.rank}</div>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{item.wallet}</span>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{item.handle ? `@${item.handle}` : item.wallet}</span>
+                    {item.handle && <span style={{ fontSize: '0.65rem', opacity: 0.5 }}>{item.wallet}</span>}
+                  </div>
                 </div>
                 <span style={{ fontSize: '0.85rem', fontWeight: 800 }}>{item.score}</span>
               </div>
