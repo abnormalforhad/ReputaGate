@@ -19,29 +19,22 @@ export interface FairScoreResponse {
     };
 }
 
-const MOCK_DATA: Record<string, FairScoreResponse> = {
-    '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU': {
-        wallet: '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU',
-        fairscore_base: 58.1,
-        social_score: 36.0,
-        fairscore: 84.5,
-        tier: 'platinum',
-        badges: [
-            { id: 'diamond_hands', label: 'Diamond Hands', description: 'Long-term holder with conviction', tier: 'platinum' },
-            { id: 'lst_maxi', label: 'LST Maxi', description: 'Heavy user of liquid staking tokens', tier: 'gold' }
-        ],
-        features: {
-            tx_count: 1250,
-            active_days: 180,
-            wallet_age_days: 365,
-            lst_percentile_score: 0.75,
-            major_percentile_score: 0.82
-        }
-    }
-};
+export interface LeaderboardEntry {
+    rank: number;
+    wallet: string;
+    score: number;
+    tier: string;
+}
+
+export interface TierEntry {
+    tier: string;
+    count: number;
+    color: string;
+}
 
 export class FairScaleService {
     private static API_KEY = import.meta.env.VITE_FAIRSCALE_API_KEY || '';
+    private static STORAGE_KEY = 'reputagate_leaderboard';
 
     static async getScore(wallet: string): Promise<FairScoreResponse> {
         // If we have an API key, use the real endpoint
@@ -51,26 +44,43 @@ export class FairScaleService {
                     headers: { 'fairkey': this.API_KEY }
                 });
                 if (!response.ok) throw new Error('FairScale API Error');
-                return await response.json();
+                const data = await response.json();
+
+                // Persistence: Save this real score to the local index
+                this.persistEntry(data);
+
+                return data;
             } catch (error) {
-                console.error('FairScale API failed, falling back to mock:', error);
+                console.error('FairScale API failed:', error);
             }
         }
 
-        // Default mock behavior
-        return new Promise((resolve) => {
-            setTimeout(() => {
-                resolve(MOCK_DATA[wallet] || {
-                    wallet,
-                    fairscore_base: 20,
-                    social_score: 10,
-                    fairscore: 30,
-                    tier: 'bronze',
-                    badges: [],
-                    features: { tx_count: 10, active_days: 5, wallet_age_days: 10 }
-                });
-            }, 800);
-        });
+        // Return pure zeroed state (No Mock Fallbacks)
+        return {
+            wallet,
+            fairscore_base: 0,
+            social_score: 0,
+            fairscore: 0,
+            tier: 'bronze',
+            badges: [],
+            features: { tx_count: 0, active_days: 0, wallet_age_days: 0 }
+        };
+    }
+
+    private static persistEntry(data: FairScoreResponse) {
+        try {
+            const saved = JSON.parse(localStorage.getItem(this.STORAGE_KEY) || '{}');
+            saved[data.wallet] = {
+                rank: 0, // Rank will be calculated on fetch
+                wallet: data.wallet.slice(0, 4) + '...' + data.wallet.slice(-4),
+                score: data.fairscore,
+                tier: data.tier,
+                fullWallet: data.wallet
+            };
+            localStorage.setItem(this.STORAGE_KEY, JSON.stringify(saved));
+        } catch (e) {
+            console.error('Failed to persist score:', e);
+        }
     }
 
     static getAPRBonus(tier: string): number {
@@ -80,5 +90,59 @@ export class FairScaleService {
             case 'silver': return 2;
             default: return 0;
         }
+    }
+
+    static getLeaderboard(): LeaderboardEntry[] {
+        try {
+            const saved = JSON.parse(localStorage.getItem(this.STORAGE_KEY) || '{}');
+            const entries: LeaderboardEntry[] = Object.values(saved);
+
+            // Sort by score descending and take top 10
+            return entries
+                .sort((a, b) => b.score - a.score)
+                .map((item, index) => ({
+                    ...item,
+                    rank: index + 1
+                }))
+                .slice(0, 10);
+        } catch (e) {
+            return [];
+        }
+    }
+
+    static getTierDistribution(): TierEntry[] {
+        try {
+            const saved = JSON.parse(localStorage.getItem(this.STORAGE_KEY) || '{}');
+            const entries = Object.values(saved) as any[];
+
+            const counts = {
+                platinum: entries.filter(e => e.tier === 'platinum').length,
+                gold: entries.filter(e => e.tier === 'gold').length,
+                silver: entries.filter(e => e.tier === 'silver').length,
+                bronze: entries.filter(e => e.tier === 'bronze').length
+            };
+
+            return [
+                { tier: 'Platinum', count: counts.platinum, color: '#fbbf24' },
+                { tier: 'Gold', count: counts.gold, color: '#f59e0b' },
+                { tier: 'Silver', count: counts.silver, color: '#d1d5db' },
+                { tier: 'Bronze', count: counts.bronze, color: '#9ca3af' },
+            ];
+        } catch (e) {
+            return [
+                { tier: 'Platinum', count: 0, color: '#fbbf24' },
+                { tier: 'Gold', count: 0, color: '#f59e0b' },
+                { tier: 'Silver', count: 0, color: '#d1d5db' },
+                { tier: 'Bronze', count: 0, color: '#9ca3af' },
+            ];
+        }
+    }
+
+    static getActivityFeed() {
+        return [
+            "Network Status: Monitoring Solana Neural Index",
+            "Privacy Mode: Active",
+            "Waiting for on-chain identity events..."
+        ];
     }
 }
