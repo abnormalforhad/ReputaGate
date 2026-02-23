@@ -96,22 +96,26 @@ export class FairScaleService {
 
     static async getLeaderboard(): Promise<LeaderboardEntry[]> {
         try {
-            const response = await fetch('https://app.fairscale.xyz/api/leaderboard?page=1&limit=10');
+            // Using relative path to trigger Vite Proxy (bypasses CORS locally)
+            const response = await fetch('/api/leaderboard?page=1&limit=10');
             if (!response.ok) throw new Error('Failed to fetch leaderboard');
             const data = await response.json();
 
-            return data.data.map((item: any, index: number) => ({
-                rank: index + 1,
+            // Handle both 'entries' (official) and 'data' (docs) structures
+            const entries = data.entries || data.data || [];
+
+            return entries.map((item: any, index: number) => ({
+                rank: item.rank || (index + 1),
                 wallet: item.wallet.slice(0, 4) + '...' + item.wallet.slice(-4),
-                score: item.fair_score,
+                score: item.wallet_score || item.fair_score || item.score || 0,
                 tier: item.tier || 'bronze',
-                handle: item.twitter_handle,
-                pfp: item.twitter_pfp,
+                handle: item.user?.x_handle || item.twitter_handle || item.handle,
+                pfp: item.user?.x_pfp || item.twitter_pfp || item.pfp,
                 fullWallet: item.wallet
             }));
         } catch (e) {
             console.error('Failed to fetch global leaderboard:', e);
-            // Fallback to local persistence if API fails
+            // Fallback to local persistence if API fails (CORS or Network)
             try {
                 const saved = JSON.parse(localStorage.getItem(this.STORAGE_KEY) || '{}');
                 const entries: LeaderboardEntry[] = Object.values(saved);
