@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/leaderboard",
+      "destination": "https://app.fairscale.xyz/api/leaderboard"
+    }
+  ]
+}
