@@ -36,10 +36,10 @@ ReputaGate integrates the FairScale API to verify wallet reputation in real-time
    ```
 
 ## 👥 Team
-- **stfu0911** - Founder & Lead Architect
+- **stfu0911** - Builder
   - Role: Full-stack implementation & FairScale Integration.
   - Experience: 5+ years in high-frequency trading infrastructure and decentralized identity systems.
-  - Contact: [FairScale Support](https://t.me/+XF23ay9aY1AzYzlk)
+  - Contact: (https://t.me/+XF23ay9aY1AzYzlk)
 
 ---
 Built for the **FairScale FAIRathon**. 
